@@ -1,18 +1,12 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 
 	"projectOzonBank/internal/domain"
 )
-
-type Shortener interface {
-	Shorten(ctx context.Context, url string) (string, error)
-	Resolve(ctx context.Context, code string) (string, error)
-}
 
 type Handler struct {
 	service Shortener
