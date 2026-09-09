@@ -10,17 +10,15 @@ import (
 	"projectOzonBank/internal/shortener"
 )
 
-const defaultMaxRetries = 5
-
 type LinkService struct {
 	storage    domain.Storage
 	maxRetries int
 }
 
-func New(storage domain.Storage) *LinkService {
+func New(storage domain.Storage, maxRetries int) *LinkService {
 	return &LinkService{
 		storage:    storage,
-		maxRetries: defaultMaxRetries,
+		maxRetries: maxRetries,
 	}
 }
 
@@ -41,7 +39,7 @@ func (s *LinkService) Shorten(ctx context.Context, originalURL string) (string, 
 	for i := 0; i < s.maxRetries; i++ {
 		code, err := shortener.Generate()
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("generate code: %w", err)
 		}
 
 		err = s.storage.Save(ctx, code, originalURL)
@@ -61,10 +59,7 @@ func (s *LinkService) Shorten(ctx context.Context, originalURL string) (string, 
 		return "", err
 	}
 
-	return "", fmt.Errorf(
-		"Не получилось сгенерировать код после попыток %d ",
-		s.maxRetries,
-	)
+	return "", fmt.Errorf("%w: exhausted %d attempts", domain.ErrGenerationFailed, s.maxRetries)
 }
 
 func (s *LinkService) Resolve(ctx context.Context, code string) (string, error) {

@@ -21,8 +21,7 @@ import (
 	"projectOzonBank/internal/storage/postgres"
 )
 
-// StorageType — допустимые бэкенды хранения. Типизация вместо голых строк
-// защищает от опечаток на этапе компиляции.
+// StorageType — допустимые бэкенды хранения. защищает от опечаток на этапе компиляции.
 type StorageType string
 
 const (
@@ -39,13 +38,12 @@ type Config struct {
 	WriteTimeout    time.Duration
 	IdleTimeout     time.Duration
 	ShutdownTimeout time.Duration
+	MaxRetries      int
 }
 
 func loadConfig() Config {
-	// .env — best effort, отсутствие файла не является ошибкой
-	// (например, в Docker переменные приходят напрямую из окружения)
 	_ = godotenv.Load()
-
+	maxRetries := flag.Int("max-retries", 5, "max attempts to generate a unique code")
 	storageType := flag.String("storage", getEnv("STORAGE", string(StorageMemory)), "storage backend: memory or postgres")
 	addr := flag.String("addr", getEnv("ADDR", ":8080"), "http server address")
 	dsn := flag.String("dsn", os.Getenv("DATABASE_URL"), "PostgreSQL connection string")
@@ -59,6 +57,7 @@ func loadConfig() Config {
 		WriteTimeout:    10 * time.Second,
 		IdleTimeout:     60 * time.Second,
 		ShutdownTimeout: 5 * time.Second,
+		MaxRetries:      *maxRetries,
 	}
 }
 
@@ -85,7 +84,7 @@ func run() error {
 	}
 	defer cleanup()
 
-	service := app.New(storage)
+	service := app.New(storage, cfg.MaxRetries)
 	handler := api.NewHandler(service)
 	router := api.NewRouter(handler)
 
@@ -131,7 +130,7 @@ func run() error {
 }
 
 // newStorage создаёт нужную реализацию domain.Storage по конфигу.
-// Возвращает функцию очистки ресурсов — вызывающий код обязан
+// Возвращает функцию очистки ресурсов - вызывающий код обязан
 // вызвать её через defer.
 func newStorage(ctx context.Context, cfg Config) (domain.Storage, func(), error) {
 	switch cfg.Storage {

@@ -13,7 +13,7 @@ import (
 func TestLinkService_Shorten_Success(t *testing.T) {
 	ctx := context.Background()
 	storage := memory.New()
-	service := New(storage)
+	service := New(storage, 5)
 
 	code, err := service.Shorten(ctx, "https://google.com")
 	if err != nil {
@@ -45,7 +45,7 @@ func TestLinkService_Shorten_InvalidURL(t *testing.T) {
 	ctx := context.Background()
 
 	storage := memory.New()
-	service := New(storage)
+	service := New(storage, 5)
 
 	invalidURLs := []string{
 		"google.com",
@@ -71,7 +71,7 @@ func TestLinkService_Shorten_DuplicateURL_ReturnsSameCode(t *testing.T) {
 	ctx := context.Background()
 
 	storage := memory.New()
-	service := New(storage)
+	service := New(storage, 5)
 
 	originalURL := "https://google.com"
 
@@ -98,7 +98,7 @@ func TestLinkService_Resolve_Success(t *testing.T) {
 	ctx := context.Background()
 
 	storage := memory.New()
-	service := New(storage)
+	service := New(storage, 5)
 
 	originalURL := "https://google.com"
 
@@ -125,7 +125,7 @@ func TestLinkService_Resolve_NotFound(t *testing.T) {
 	ctx := context.Background()
 
 	storage := memory.New()
-	service := New(storage)
+	service := New(storage, 5)
 
 	_, err := service.Resolve(ctx, "1234567890")
 
@@ -134,5 +134,25 @@ func TestLinkService_Resolve_NotFound(t *testing.T) {
 			"ожидалась ErrNotFound, получена: %v",
 			err,
 		)
+	}
+}
+
+type alwaysTakenStorage struct{}
+
+func (alwaysTakenStorage) Save(ctx context.Context, code, url string) error {
+	return domain.ErrCodeAlreadyTaken
+}
+
+func (alwaysTakenStorage) Get(ctx context.Context, code string) (string, error) {
+	return "", domain.ErrNotFound
+}
+
+func TestLinkService_Shorten_ExhaustedRetries(t *testing.T) {
+	ctx := context.Background()
+	service := New(alwaysTakenStorage{}, 2)
+
+	_, err := service.Shorten(ctx, "https://google.com")
+	if !errors.Is(err, domain.ErrGenerationFailed) {
+		t.Errorf("ожидалась ErrGenerationFailed, получена: %v", err)
 	}
 }

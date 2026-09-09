@@ -2,8 +2,9 @@ package memory
 
 import (
 	"context"
-	"projectOzonBank/internal/domain"
 	"sync"
+
+	"projectOzonBank/internal/domain"
 )
 
 type Storage struct {
@@ -18,27 +19,28 @@ func New() *Storage {
 		urlToCode: make(map[string]string),
 	}
 }
+
 func (s *Storage) Save(ctx context.Context, code, originalURL string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	data, ok := s.urlToCode[originalURL]
-	if ok {
-		return &domain.AlreadyExistsError{
-			ExistingCode: data,
-		}
-	} else {
-		_, ok = s.codeToURL[code]
-		if ok {
-			return domain.ErrCodeAlreadyTaken
-		}
+
+	if existingCode, ok := s.urlToCode[originalURL]; ok {
+		return &domain.AlreadyExistsError{ExistingCode: existingCode}
 	}
+
+	if _, ok := s.codeToURL[code]; ok {
+		return domain.ErrCodeAlreadyTaken
+	}
+
 	s.urlToCode[originalURL] = code
 	s.codeToURL[code] = originalURL
 	return nil
 }
+
 func (s *Storage) Get(ctx context.Context, code string) (string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
 	data, ok := s.codeToURL[code]
 	if ok {
 		return data, nil
